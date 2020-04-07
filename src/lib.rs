@@ -288,8 +288,9 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         H: 'static,
         M: 'static,
     {
+        let handle = self.clone();
         tokio::spawn(async move {
-            self._send(IntMessage::Message(dest, msg)).await;
+            handle._send(IntMessage::Message(dest, msg)).await;
         });
     }
     
