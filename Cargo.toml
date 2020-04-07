@@ -1,6 +1,6 @@
 [package]
 name = "msg_bus"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Matt Bradbury <matt@bexars.com>"]
 edition = "2018"
 
