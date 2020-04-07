@@ -283,6 +283,17 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         }
     }
 
+    pub fn blocking_send(&'static mut self, dest: H, msg: M) 
+    where
+        H: 'static,
+        M: 'static,
+    {
+        tokio::spawn(async move {
+            self._send(IntMessage::Message(dest, msg)).await;
+        });
+    }
+    
+
 
     /// Straightforward message sending function.  The selected listener on 'dest' will receive a `Message::Message(M)` enum.
     pub async fn send(&mut self, dest: H, msg: M) -> Result<(), MsgBusClosed>
