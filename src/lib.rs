@@ -165,8 +165,9 @@ impl<
 
     async fn msg_to(&self, key: H, msg: M) {
         let s = self.senders.write().await;
-        let mut tx = s.get(&key).unwrap().clone();
-        tx.send(Message::Message(msg)).await;
+        if let Some(tx) = s.get(&key) {
+            tx.clone().send(Message::Message(msg)).await;
+        };
     }
 
     async fn unreg(&self, key: H) {
@@ -283,17 +284,6 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         }
     }
 
-    pub fn blocking_send(&'static mut self, dest: H, msg: M) 
-    where
-        H: 'static,
-        M: 'static,
-    {
-        let handle = self.clone();
-        tokio::spawn(async move {
-            handle._send(IntMessage::Message(dest, msg)).await;
-        });
-    }
-    
 
 
     /// Straightforward message sending function.  The selected listener on 'dest' will receive a `Message::Message(M)` enum.
@@ -387,10 +377,15 @@ mod tests {
         assert_eq!(ans3, "Hello".to_string());
     }
 
+    #[tokio::test]
+    async fn test_nonexistant_destination() {
+        let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
+        mbh.send(1000, 0);
+    }
+
     #[should_panic]
     #[tokio::test]
     async fn test_shutdown_panic() {
-        env_logger::init();
 
         let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
         let mut mbh2 = mbh.clone();
@@ -428,7 +423,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_shutdown_message() {
-        env_logger::init();
 
         let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
         let mut mbh2 = mbh.clone();
@@ -457,7 +451,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_rpc() {
-        env_logger::init();
+        // env_logger::init();
 
         let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
         let mut mbh2 = mbh.clone();
@@ -490,7 +484,6 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_pingpong() {
-        env_logger::init();
 
         let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
         let mut mbh2 = mbh.clone();
@@ -530,7 +523,7 @@ mod tests {
 
         let mut num = 0;
         mbh.send(2000, 0).await;
-        while num < 500000 {
+        while num < 5000 {
             delay_for(Duration::from_millis(100)).await;
             num = mbh.rpc(2000, 0).await.unwrap();
             info!("Num = {}", num);
@@ -540,8 +533,10 @@ mod tests {
         // tokio::task::yield_now().await;
         // tokio::task::yield_now().await;
         delay_for(Duration::from_millis(1000)).await;
-        mbh.send(2000, 1000).await;
-        assert!(mbh.rpc(2000, 420).await.unwrap() > 500000);
-        msg_bus.shutdown().await;
+        // mbh.send(2000, 1000).await;
+        let result = mbh.rpc(2000, 420).await.unwrap();
+        println!("result: {}", result); 
+        assert!(result > 5000);
+        // msg_bus.shutdown().await;
     }
 }
