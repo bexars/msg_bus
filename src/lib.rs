@@ -220,9 +220,21 @@ pub struct MsgBusClosed {}
 /// This handle is returned as part of the tuple from `MsgBus::new()`
 /// 
 
+
+
 pub struct MsgBusHandle<H, M> {
     bus_tx: mpsc::Sender<IntMessage<H, M>>,
     // id: Option<H>,
+}
+
+impl<H: Send + Sync, M: Send + Sync> Clone for MsgBusHandle<H, M> {
+    /// Cloneing is the only way to get more handles.  Each handle has no memory except for how to talk to the `MsgBus`.  Any handle can send
+    /// to any listener
+    fn clone(&self) -> Self {
+        Self {
+            bus_tx: self.bus_tx.clone(),
+        }
+    }
 }
 
 impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
@@ -230,13 +242,7 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
     //     self.id = Some(id);
     // }
 
-    /// Cloneing is the only way to get more handles.  Each handle has no memory except for how to talk to the `MsgBus`.  Any handle can send
-    /// to any listener
-    pub fn clone(&self) -> Self {
-        Self {
-            bus_tx: self.bus_tx.clone(),
-        }
-    }
+
 
     /// Returns a Receiver that will get any messages destined for `id`.  The messages will be encased in the `Message` enum.
     pub async fn register(&mut self, id: H) -> Result<mpsc::Receiver<Message<M>>, MsgBusClosed>
