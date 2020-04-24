@@ -4,8 +4,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 #[allow(dead_code)]
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot;
+use tokio::sync::oneshot::error::{RecvError};
 use tokio::sync::RwLock;
+use std::error;
+use std::fmt;
+
+mod tests;
+
+type Result<T> = std::result::Result<T, MsgBusError>;
 
 #[derive(Debug)]
 enum IntMessage<H, M> {
@@ -13,11 +21,17 @@ enum IntMessage<H, M> {
     Register(H, mpsc::Sender<Message<M>>),
     Unregister(H), // Unregister listener
     Broadcast(M),  // Broadcast to all listeners, from H
-    Rpc(H, M, oneshot::Sender<M>),
+
+    Rpc(H, M, oneshot::Sender<RpcResponse<M>>),
     Message(H, M),
     Shutdown,
 }
 
+#[derive(Debug)]
+enum RpcResponse<M> {
+    Ok(oneshot::Receiver<M>),
+    Err(MsgBusError),
+}
 /// Enum that all listeners will need to process.  
 /// 
 /// # Message
@@ -48,7 +62,7 @@ pub enum Message<M> {
 /// * `shutdown()` - Sends a Message::Shutdown message to all listeners and closes the receive port.  Once the queue
 /// is empty it will exit
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct MsgBus<H, M>
 where
     H: std::hash::Hash,
@@ -60,7 +74,7 @@ where
 }
 
 impl<
-        H: Send + std::hash::Hash + Eq + PartialEq + Sync + std::fmt::Debug,
+        H: Send + Clone + std::hash::Hash + Eq + PartialEq + Sync + std::fmt::Debug,
         M: Send + Clone + Sync + std::fmt::Debug,
     > MsgBus<H, M>
 {
@@ -95,8 +109,8 @@ impl<
         )
     }
     /// Sends a `Message::Shutdown` to all registered listeners.  Then shuts down the `MsgBus` process.  
-    pub async fn shutdown(mut self) {
-        self.tx.send(IntMessage::Shutdown).await;
+    pub async fn shutdown(mut self) -> Result<()> {
+        Ok(self.tx.send(IntMessage::Shutdown).await?)
     }
 
     async fn run(self)
@@ -104,11 +118,12 @@ impl<
         H: 'static,
         M: 'static,
     {
+        // let rx = self.rx.clone();
         while let Some(msg) = self.rx.write().await.recv().await {
             debug!("Got {:?}", msg);
             // if let IntMessage::Shutdown = msg {
             //     debug!("Shutting down rx");
-            //     //self.rx.write().await.close();
+            //     self.rx.write().await.close();
             // }
             let bus = self.clone();
             tokio::spawn(async move {
@@ -137,37 +152,67 @@ impl<
         }
     }
 
-    async fn int_shutdown(&self) {
+    async fn int_shutdown(&self)  {
         debug!("Begin int_shutdown");
-        for (_, s) in self.senders.write().await.iter_mut() {
-            s.clone().send(Message::Shutdown).await;
-            tokio::task::yield_now().await;
+        let mut senders = self.senders.write().await;
+        for (_, s) in senders.iter_mut() {
+            let _res = s.send(Message::Shutdown).await;
+            // drop(s);
+            // tokio::task::yield_now().await;
         }
-        tokio::task::yield_now().await;
+        senders.clear();
+        // tokio::task::yield_now().await;
         debug!("Done looping the shutdown");
         self.rx.write().await.close();
-        tokio::task::yield_now().await;
+        // tokio::task::yield_now().await;
 
         debug!("Leaving int_shutdown");
     }
 
-    async fn rpc(&self, key: H, msg: M, resp_tx: oneshot::Sender<M>) {
-        let s = self.senders.write().await;
-        let mut tx = s.get(&key).unwrap().clone();
-        tx.send(Message::Rpc(msg, resp_tx)).await;
+
+
+    async fn rpc(&self, key: H, msg: M, resp_tx: oneshot::Sender<RpcResponse<M>>) {
+        let mut s = self.senders.write().await;
+        match s.get_mut(&key) {
+            Some(tx) => { 
+                let (new_oneshot_tx, rx) = oneshot::channel::<M>();
+                match tx.send(Message::Rpc(msg, new_oneshot_tx)).await {
+                    Ok(_x) => {
+                        resp_tx.send(RpcResponse::Ok(rx)).unwrap();
+                    },
+                    Err(_e) => {
+                        resp_tx.send(RpcResponse::Err(crate::MsgBusError::MsgBusClosed)).unwrap();
+                    }
+                }
+            },
+            None => {
+                resp_tx.send(RpcResponse::Err(MsgBusError::UnknownRecipient)).unwrap();
+                return;
+            }
+        };
     }
 
     async fn broadcast(&self, msg: M) {
-        for (_, s) in self.senders.write().await.iter_mut() {
-            s.clone().send(Message::Broadcast(msg.clone())).await;
-        }
+        let mut senders = self.senders.write().await;
+
+        senders.retain(|k,v| -> bool {
+            match futures::executor::block_on(v.send(Message::Broadcast(msg.clone()))) {
+                Ok(_) => { true },
+                Err(_) => { 
+                    debug!("Dropped in broadcast {:?}", k);
+                    false },
+            }
+        })
     }
 
     async fn msg_to(&self, key: H, msg: M) {
-        let s = self.senders.write().await;
-        if let Some(tx) = s.get(&key) {
-            tx.clone().send(Message::Message(msg)).await;
-        };
+        let mut s = self.senders.write().await;
+        if let Some(tx) = &mut s.get_mut(&key) {
+            match tx.send(Message::Message(msg)).await {
+                Ok(()) => {},
+                Err(_) => { s.remove(&key); },
+            }
+        } 
     }
 
     async fn unreg(&self, key: H) {
@@ -177,7 +222,10 @@ impl<
     async fn reg(&self, key: H, tx: mpsc::Sender<Message<M>>) {
         self.senders.write().await.insert(key, tx);
     }
+}
 
+impl<H: Send + std::hash::Hash + Eq + PartialEq + Sync + std::fmt::Debug,
+    M: Send + Clone + Sync + std::fmt::Debug, > Clone for MsgBus<H,M> {
     fn clone(&self) -> Self {
         Self {
             rx: self.rx.clone(),
@@ -190,7 +238,40 @@ impl<
 /// Error type returned when trying to send a message through `MsgBusHandle` and `MsgBus` is shut down
 
 #[derive(Debug)]
-pub struct MsgBusClosed {}
+pub enum MsgBusError {
+    MsgBusClosed,
+    UnknownRecipient,
+}
+
+// This is important for other errors to wrap this one.
+impl error::Error for MsgBusError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
+}
+
+impl fmt::Display for MsgBusError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            MsgBusError::MsgBusClosed => { write!(f,"MsgBus is shutdown") },
+            MsgBusError::UnknownRecipient => { write!(f, "Destination was not registered")}, 
+        }
+    }
+}
+
+// tokio::sync::oneshot::error::RecvError
+impl From<RecvError> for MsgBusError {
+    fn from(_: RecvError) -> MsgBusError {
+        MsgBusError::MsgBusClosed
+    }
+}
+
+impl<T> From<SendError<T>> for MsgBusError {
+    fn from(_: SendError<T>) -> MsgBusError {
+        MsgBusError::MsgBusClosed
+    }
+}
 
 /// This is the main interface for MsgBus.  It's cloneable, can send to any registered listener and can create and register
 /// infinite amount of listeners.  When register is called it will return a tokio::sync::mpsc::Receiver<H,M>.  You will need to
@@ -245,7 +326,7 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
 
 
     /// Returns a Receiver that will get any messages destined for `id`.  The messages will be encased in the `Message` enum.
-    pub async fn register(&mut self, id: H) -> Result<mpsc::Receiver<Message<M>>, MsgBusClosed>
+    pub async fn register(&mut self, id: H) -> Result<mpsc::Receiver<Message<M>>>
     where
         H: 'static,
         M: 'static,
@@ -258,8 +339,21 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         }
     }
 
+    pub async fn unregister(&mut self, id: H) -> Result<()>
+    where
+        H: 'static,
+        M: 'static,
+    {
+        if let Err(e) = self._send(IntMessage::Unregister(id)).await {
+            Err(e)
+        } else {
+            Ok(())
+        }
+    }
+
+
     /// Sends a message of type M to all listeners/receivers.  It will show up as `Message::Broadcast(M)` at the listeners
-    pub async fn broadcast(&mut self, msg: M) -> Result<(), MsgBusClosed>
+    pub async fn broadcast(&mut self, msg: M) -> Result<()>
     where
         H: 'static,
         M: 'static,
@@ -275,274 +369,52 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
     /// A simple RPC function that sends a message to a specific listener and gives them a `tokio::sync::oneshot::Sender<M>` to reply with.
     /// The listener will receive a `Message::Rpc(M, oneshot::Sender<M>`).  There are no timeouts, though the Receiver will error if the Sender Drops
     /// 
-    pub async fn rpc(&mut self, dest: H, msg: M) -> Result<M, MsgBusClosed>
+    pub async fn rpc(&mut self, dest: H, msg: M) -> Result<M>
     where
         H: 'static,
         M: 'static,
     {
-        let (tx, rx) = oneshot::channel::<M>();
+        let (tx, rx) = oneshot::channel::<RpcResponse<M>>();
         if let Err(e) = self._send(IntMessage::Rpc(dest, msg, tx)).await {
             return Err(e);
         };
         match rx.await {
-            Err(e) => Err(MsgBusClosed {}),
-            Ok(in_msg) => Ok(in_msg),
+            Err(e) => { return Err(MsgBusError::from(e)) },
+            Ok(RpcResponse::Err(e)) => { Err(e) },
+            Ok(RpcResponse::Ok(rpc_resp)) => {
+                Ok(rpc_resp.await?)
+            }
         }
+        // {
+        //     Err(_) => Err(MsgBusError::MsgBusClosed),
+        //     Ok(in_msg) => Ok(in_msg),
+        // }
     }
 
 
 
     /// Straightforward message sending function.  The selected listener on 'dest' will receive a `Message::Message(M)` enum.
-    pub async fn send(&mut self, dest: H, msg: M) -> Result<(), MsgBusClosed>
+    pub async fn send(&mut self, dest: H, msg: M) -> Result<()>
     where
         H: 'static,
         M: 'static,
     {
-        if let Err(e) = self._send(IntMessage::Message(dest, msg)).await {
-            Err(e)
-        } else {
-            Ok(())
-        }
+        Ok(self._send(IntMessage::Message(dest, msg)).await?)
+        // if let Err(e) = self._send(IntMessage::Message(dest, msg)).await {
+        //     Err(e)
+        // } else {
+        //     Ok(())
+        // }
     }
 
-    async fn _send<'a>(&self, msg: IntMessage<H, M>) -> Result<(), MsgBusClosed>
+    async fn _send<'a>(&self, msg: IntMessage<H, M>) -> std::result::Result<(), MsgBusError>
     where
         H: 'static,
         M: 'static,
     {
         let msg = msg;
         let mut bus_tx = self.bus_tx.clone();
-
-        if let Err(_) = bus_tx.send(msg).await {
-            Err(MsgBusClosed {})
-        } else {
-            Ok(())
-        }
+        Ok(bus_tx.send(msg).await?)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::Duration;
-    use std::{thread, time};
-    use tokio::time::delay_for;
-    // enum TestMessage {
-    //     Hello(String),
-    //     World(usize),
-    // }
-    #[tokio::test]
-    async fn test_send_message() {
-        // env_logger::init();
-
-        let (_, mut mbh) = MsgBus::<usize, String>::new();
-        let mut mbh2 = mbh.clone();
-
-        let mut rx = mbh.register(1001).await.unwrap();
-        mbh2.send(1001, "Hello".to_string()).await;
-        println!("rx: {:?}", rx);
-        let response = rx.recv().await;
-        println!("response: {:?}", response);
-
-        let response = response.unwrap();
-        let answer = match response {
-            Message::Message(text) => text,
-            _ => "Failure".to_string(),
-        };
-        assert_eq!(answer, "Hello".to_string());
-    }
-
-    #[tokio::test]
-    async fn test_broadcast() {
-        let (_, mut mbh) = MsgBus::<usize, String>::new();
-        let mut mbh2 = mbh.clone();
-        let mut mbh3 = mbh.clone();
-
-        let mut rx = mbh.register(1001).await.unwrap();
-        let mut rx2 = mbh2.register(2002).await.unwrap();
-        let mut rx3 = mbh3.register(3003).await.unwrap();
-        mbh.broadcast("Hello".to_string()).await;
-        let resp = rx.recv().await.unwrap();
-        let resp2 = rx2.recv().await.unwrap();
-        let resp3 = rx3.recv().await.unwrap();
-        let ans1 = match resp {
-            Message::Broadcast(text) => text,
-            _ => "Failure".to_string(),
-        };
-        let ans2 = match resp2 {
-            Message::Broadcast(text) => text,
-            _ => "Failure".to_string(),
-        };
-        let ans3 = match resp3 {
-            Message::Broadcast(text) => text,
-            _ => "Failure".to_string(),
-        };
-
-        assert_eq!(ans1, "Hello".to_string());
-        assert_eq!(ans2, "Hello".to_string());
-        assert_eq!(ans3, "Hello".to_string());
-    }
-
-    #[tokio::test]
-    async fn test_nonexistant_destination() {
-        let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
-        mbh.send(1000, 0);
-    }
-
-    #[should_panic]
-    #[tokio::test]
-    async fn test_shutdown_panic() {
-
-        let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
-        let mut mbh2 = mbh.clone();
-
-        let mut rx = mbh.register(1001).await.unwrap();
-        tokio::task::spawn(async move {
-            mbh2.send(1001, "Hello".to_string()).await;
-            delay_for(Duration::from_millis(1000)).await;
-            debug!("Awake");
-            mbh2.send(1001, "Hello".to_string()).await;
-            msg_bus.shutdown().await;
-            delay_for(Duration::from_millis(1000)).await;
-            debug!("Awake");
-            mbh2.send(1001, "Hello".to_string()).await;
-        });
-
-        while let Some(response) = rx.recv().await {
-            let answer = match response {
-                Message::Shutdown => {
-                    debug!("SHUT DOWN");
-
-                    "Shutdown".to_string()
-                }
-                Message::Message(text) => text,
-                _ => "Failure".to_string(),
-            };
-        }
-        let should_be_none = rx.recv().await.unwrap();
-        debug!("should be none: {:?}", should_be_none);
-        tokio::task::yield_now().await;
-
-        //assert_eq!(answer, "Shutdown".to_string());
-        //assert(let None = should_be_none);
-    }
-
-    #[tokio::test]
-    async fn test_shutdown_message() {
-
-        let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
-        let mut mbh2 = mbh.clone();
-
-        let mut rx = mbh.register(1001).await.unwrap();
-        mbh2.send(1002, "Hello".to_string()).await;
-        let response = rx.recv();
-
-        msg_bus.shutdown().await;
-        let response = response.await.unwrap();
-        debug!("Response progressed");
-        let answer = match response {
-            Message::Shutdown => "Shutdown".to_string(),
-            Message::Message(text) => text,
-            _ => "Failure".to_string(),
-        };
-        // let should_be_none = rx.recv().await.unwrap();
-        tokio::task::yield_now().await;
-        let ten_millis = time::Duration::from_millis(1000);
-        let now = time::Instant::now();
-        thread::sleep(ten_millis);
-
-        assert_eq!(answer, "Shutdown".to_string());
-        //assert(let None = should_be_none);
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn test_rpc() {
-        // env_logger::init();
-
-        let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
-        let mut mbh2 = mbh.clone();
-
-        let mut rx = mbh.register(1001).await.unwrap();
-        tokio::task::spawn(async move {
-            // mbh2.send(1001, "Hello".to_string()).await;
-            let mut rx = mbh2.register(2000).await.unwrap();
-            while let Some(msg) = rx.recv().await {
-                match msg {
-                    Message::Rpc(input_num, resp_tx) => {
-                        resp_tx.send(input_num + 69);
-                    }
-                    Message::Message(input_num) => {
-                        debug!("In loop Message: {}", input_num);
-                    }
-                    Message::Shutdown => {}
-                    _ => {}
-                }
-            }
-        });
-        // tokio::task::yield_now().await;
-        // tokio::task::yield_now().await;
-        // tokio::task::yield_now().await;
-        delay_for(Duration::from_millis(1000)).await;
-        mbh.send(2000, 1000).await;
-        assert_eq!(mbh.rpc(2000, 420).await.unwrap(), 489);
-        msg_bus.shutdown().await;
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn test_pingpong() {
-
-        let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
-        let mut mbh2 = mbh.clone();
-        let mut mbh3 = mbh.clone();
-
-        let mut rx = mbh.register(1001).await.unwrap();
-        tokio::task::spawn(async move {
-            let mut counter = 0;
-            let mut rx = mbh2.register(2000).await.unwrap();
-            while let Some(msg) = rx.recv().await {
-                match msg {
-                    Message::Rpc(input_num, resp_tx) => {
-                        resp_tx.send(counter);
-                    }
-                    Message::Message(input_num) => {
-                        mbh2.send(3000, input_num + 5).await;
-                        counter = input_num;
-                    }
-                    Message::Shutdown => {}
-                    _ => {}
-                }
-            }
-        });
-        tokio::task::spawn(async move {
-            let mut rx = mbh3.register(3000).await.unwrap();
-            while let Some(msg) = rx.recv().await {
-                match msg {
-                    Message::Message(input_num) => {
-                        mbh3.send(2000, input_num + 1).await;
-                    }
-                    Message::Shutdown => {}
-                    _ => {}
-                }
-            }
-        });
-        delay_for(Duration::from_millis(100)).await;
-
-        let mut num = 0;
-        mbh.send(2000, 0).await;
-        while num < 5000 {
-            delay_for(Duration::from_millis(100)).await;
-            num = mbh.rpc(2000, 0).await.unwrap();
-            info!("Num = {}", num);
         }
 
-        // tokio::task::yield_now().await;
-        // tokio::task::yield_now().await;
-        // tokio::task::yield_now().await;
-        delay_for(Duration::from_millis(1000)).await;
-        // mbh.send(2000, 1000).await;
-        let result = mbh.rpc(2000, 420).await.unwrap();
-        println!("result: {}", result); 
-        assert!(result > 5000);
-        // msg_bus.shutdown().await;
-    }
-}
