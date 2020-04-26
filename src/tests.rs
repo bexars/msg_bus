@@ -197,9 +197,14 @@ async fn test_broadcast_after_unregister() {
 }
 
 #[tokio::test]
-async fn test_nonexistant_destination() {
+async fn test_nonexistant_destination_send() {
     let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     mbh.send(1000, 0).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_nonexistant_destination_rpc() {
+    let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     let resp = mbh.rpc(1000, 0).await;
     if let Err(MsgBusError::UnknownRecipient) = resp {
         return;
