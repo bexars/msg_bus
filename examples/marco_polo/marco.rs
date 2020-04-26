@@ -1,20 +1,21 @@
 use super::*;
-use tokio::time::delay_for;
 use std::time::Duration;
+use tokio::time::delay_for;
 
-pub struct Marco {
-}
+pub struct Marco {}
 
 impl Marco {
-    pub async fn start(mut handle: MsgBusHandle<String, MarcoPoloMsg>, mut bus: MsgBus<String, MarcoPoloMsg>) {
+    pub async fn start(
+        mut handle: MsgBusHandle<String, MarcoPoloMsg>,
+        mut bus: MsgBus<String, MarcoPoloMsg>,
+    ) {
         let stdin: tokio::io::Stdin = tokio::io::stdin();
         let mut stdin = tokio::io::BufReader::new(stdin);
-        
-        
+
         let mut rx = handle.register(String::from("Marco")).await.unwrap();
-        loop {  
+        loop {
             let mut input = String::new();
-            tokio::select!{
+            tokio::select! {
                 Ok(_len) = stdin.read_line(&mut input) => {
                     let input = input.trim();
                     match &*input {
@@ -56,10 +57,9 @@ impl Marco {
                         }
                         _ => {}  // Ignore directed and rpc messages
                     } // end match Message::...
-        
+
                 }
-            }      
-            
-        }; // end while loop
+            }
+        } // end while loop
     }
 }

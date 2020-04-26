@@ -1,17 +1,14 @@
-
-
+pub use crate::errors::MsgBusError;
+pub use crate::msgbus::MsgBus;
+pub use crate::msgbushandle::MsgBusHandle;
 /// msg_bus is a simple to use Messaging system built using tokio::sync
-
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-pub use crate::msgbushandle::MsgBusHandle as MsgBusHandle;
-pub use crate::msgbus::MsgBus as MsgBus;
-pub use crate::errors::MsgBusError as MsgBusError;
 
-mod tests;
+mod errors;
 mod msgbus;
 mod msgbushandle;
-mod errors;
+mod tests;
 
 pub type Result<T> = std::result::Result<T, MsgBusError>;
 
@@ -32,7 +29,7 @@ enum RpcResponse<M> {
     Err(MsgBusError),
 }
 /// Enum that all listeners will need to process.  
-/// 
+///
 /// # Message
 /// * Broadcast - A message that has been sent to all registered listeners
 /// * Rpc - A message that is asking for a response.  Send() the response through the provided oneshot::Sender
@@ -46,6 +43,3 @@ pub enum Message<M> {
     Message(M),
     Shutdown,
 }
-
-
-

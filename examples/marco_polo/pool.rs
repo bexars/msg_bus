@@ -1,18 +1,22 @@
 use super::*;
 
-pub struct Pool {
-}
+pub struct Pool {}
 
 impl Pool {
     pub async fn start(mut handle: MsgBusHandle<String, MarcoPoloMsg>) -> io::Result<()> {
         let mut rx = handle.register(String::from("Pool")).await.unwrap();
-        handle.broadcast(MarcoPoloMsg::LifeguardYells(String::from("Hold your britches!  We'll be open in a sec..."))).await.unwrap();
+        handle
+            .broadcast(MarcoPoloMsg::LifeguardYells(String::from(
+                "Hold your britches!  We'll be open in a sec...",
+            )))
+            .await
+            .unwrap();
         // port 7780 is "MP" in ascii decimal MP = Marco Polo
         let mut players: Vec<String> = Vec::new();
 
         let mut listener = TcpListener::bind("0.0.0.0:7780").await.unwrap();
-        loop {  
-            tokio::select!{
+        loop {
+            tokio::select! {
                 Some(stream) = listener.next() => {
                     let handle = handle.clone();
                     let stream = stream.unwrap();
@@ -28,7 +32,7 @@ impl Pool {
                         }
                         Message::Rpc(mp_msg, response_handle) => {
                             match mp_msg {
-                                MarcoPoloMsg::LookAtPool => {      
+                                MarcoPoloMsg::LookAtPool => {
                                     response_handle.send(MarcoPoloMsg::Players(players.clone())).unwrap();
                                 },
                                 _ => {}  // don't care about other possibilities
@@ -45,12 +49,10 @@ impl Pool {
                         }
                         Message::Broadcast(_mp_msg ) => {}
                     }; // end match Message::...
-        
+
                 },
-            }      
-            
-        }; // end while loop
+            }
+        } // end while loop
         Ok(())
-    
     }
 }

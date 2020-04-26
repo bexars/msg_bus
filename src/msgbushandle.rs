@@ -1,35 +1,35 @@
+use crate::*;
 /// msg_bus is a simple to use Messaging system built using tokio::sync
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use crate::*;
-
 
 /// This is the main interface for MsgBus.  It's cloneable, can send to any registered listener and can create and register
 /// infinite amount of listeners.  When register is called it will return a tokio::sync::mpsc::Receiver<H,M>.  You will need to
 /// create the listen loop to handle messages.   Here's a simple example.
-/// 
+///
 /// ```
 /// use msgbus::*;
-/// 
+///
 /// enum ExampleMsg {
 ///     PingBcast,
 ///     EchoReq,
 ///     Echo,
 ///     Pong(usize),  
 /// }
-/// 
-/// let (mbus, mbushan) = MsgBus<String, String>::new();
+/// #[tokio::main]
+/// async fn main() {
+///    let (mbus, mut mbushan) = MsgBus::<String, u32>::new();
 /// 
 /// tokio::task::spawn(async move {
-///    let mut counter = 0;
-///    let mut rx = mbushan.register("listener").await.unwrap();
+///    let mut counter: u32 = 0;
+///    let mut rx = mbushan.register("listener".to_string()).await.unwrap();
 ///    while let Some(msg) = rx.recv().await {
 ///      match msg {
 ///         Message::Rpc(input_num, resp_tx) => {
 ///             resp_tx.send(counter);
 ///         }
 ///         Message::Message(input_num) => {
-///             mbh2.send("listener3", input_num + 5).await;
+///             mbushan.send("listener3".to_string(), input_num + 5).await;
 ///             counter = input_num;
 ///         }
 ///         Message::Shutdown => {}  // TODO Handle a shutdown notification?
@@ -37,13 +37,12 @@ use crate::*;
 ///     }
 /// }
 /// });
+/// }
 /// ```
-/// 
-/// 
+///
+///
 /// This handle is returned as part of the tuple from `MsgBus::new()`
-/// 
-
-
+///
 
 pub struct MsgBusHandle<H, M> {
     pub(crate) bus_tx: mpsc::Sender<IntMessage<H, M>>,
@@ -64,8 +63,6 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
     // pub fn setId(mut self, id: H) {
     //     self.id = Some(id);
     // }
-
-
 
     /// Returns a Receiver that will get any messages destined for `id`.  The messages will be encased in the `Message` enum.
     pub async fn register(&mut self, id: H) -> Result<mpsc::Receiver<Message<M>>>
@@ -93,7 +90,6 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         }
     }
 
-
     /// Sends a message of type M to all listeners/receivers.  It will show up as `Message::Broadcast(M)` at the listeners
     pub async fn broadcast(&mut self, msg: M) -> Result<()>
     where
@@ -107,10 +103,9 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         }
     }
 
-
     /// A simple RPC function that sends a message to a specific listener and gives them a `tokio::sync::oneshot::Sender<M>` to reply with.
     /// The listener will receive a `Message::Rpc(M, oneshot::Sender<M>`).  There are no timeouts, though the Receiver will error if the Sender Drops
-    /// 
+    ///
     pub async fn rpc(&mut self, dest: H, msg: M) -> Result<M>
     where
         H: 'static,
@@ -121,19 +116,15 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
             return Err(e);
         };
         match rx.await {
-            Err(e) => { return Err(MsgBusError::from(e)) },
-            Ok(RpcResponse::Err(e)) => { Err(e) },
-            Ok(RpcResponse::Ok(rpc_resp)) => {
-                Ok(rpc_resp.await?)
-            }
+            Err(e) => return Err(MsgBusError::from(e)),
+            Ok(RpcResponse::Err(e)) => Err(e),
+            Ok(RpcResponse::Ok(rpc_resp)) => Ok(rpc_resp.await?),
         }
         // {
         //     Err(_) => Err(MsgBusError::MsgBusClosed),
         //     Ok(in_msg) => Ok(in_msg),
         // }
     }
-
-
 
     /// Straightforward message sending function.  The selected listener on 'dest' will receive a `Message::Message(M)` enum.
     pub async fn send(&mut self, dest: H, msg: M) -> Result<()>
@@ -159,4 +150,3 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         Ok(bus_tx.send(msg).await?)
     }
 }
-

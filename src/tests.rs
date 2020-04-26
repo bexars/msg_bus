@@ -13,42 +13,50 @@ use std::{thread, time};
 use tokio::time::delay_for;
 #[cfg(test)]
 //use log::Level;
-
-#[cfg(test)] 
+#[cfg(test)]
 fn init() {
     let _ = env_logger::builder().is_test(true).try_init();
 }
 
-#[tokio::test] 
+#[tokio::test]
 async fn test_register() {
     let (_, mut mbh) = MsgBus::<String, String>::new();
     let mut rx = mbh.register("test".to_string()).await.unwrap();
-    mbh.send("test".to_string(),"registered?".to_string()).await.unwrap();
-    let result = if let Message::Message(result) = rx.recv().await.unwrap() { result } else {
+    mbh.send("test".to_string(), "registered?".to_string())
+        .await
+        .unwrap();
+    let result = if let Message::Message(result) = rx.recv().await.unwrap() {
+        result
+    } else {
         "failure".to_string()
     };
     assert_eq!(&result, "registered?");
 }
 
-#[tokio::test] 
+#[tokio::test]
 #[should_panic]
 async fn test_unregister() {
     let (_, mut mbh) = MsgBus::<String, String>::new();
     let mut rx = mbh.register("test".to_string()).await.unwrap();
-    mbh.send("test".to_string(),"registered?".to_string()).await.unwrap();
-    let _result = if let Message::Message(result) = rx.recv().await.unwrap() { result } else {
+    mbh.send("test".to_string(), "registered?".to_string())
+        .await
+        .unwrap();
+    let _result = if let Message::Message(result) = rx.recv().await.unwrap() {
+        result
+    } else {
         "failure".to_string()
     };
     mbh.unregister("test".to_string()).await.unwrap();
-    mbh.send("test".to_string(),"should be dropped".to_string()).await.unwrap();
-    let _result = rx.recv().await.unwrap();  // Unwrap should panic
-
-
+    mbh.send("test".to_string(), "should be dropped".to_string())
+        .await
+        .unwrap();
+    let _result = rx.recv().await.unwrap(); // Unwrap should panic
 }
 
 #[tokio::test]
 
-async fn test_send_unregistered_silent() {  // should drop without panicking
+async fn test_send_unregistered_silent() {
+    // should drop without panicking
     let (_, mut mbh) = MsgBus::<String, u32>::new();
     mbh.send("drop".to_string(), 1234).await.unwrap();
 }
@@ -128,9 +136,8 @@ async fn test_broadcast_after_drop_rx() {
     tokio::task::yield_now().await;
     tokio::task::yield_now().await;
 
-    
     //.await.unwrap();
-//        panic!("Fail now!");
+    //        panic!("Fail now!");
     let resp = mbh.broadcast("Hello".to_string()).await;
     println!("{:?}", resp);
     tokio::task::yield_now().await;
@@ -169,7 +176,7 @@ async fn test_broadcast_after_unregister() {
     mbh.unregister(2002).await.unwrap();
     mbh.broadcast("Hello".to_string()).await.unwrap();
     let resp = rx.recv().await.unwrap();
-//        let resp2 = rx2.recv().await.unwrap();
+    //        let resp2 = rx2.recv().await.unwrap();
     let resp3 = rx3.recv().await.unwrap();
     let ans1 = match resp {
         Message::Broadcast(text) => text,
@@ -188,7 +195,6 @@ async fn test_broadcast_after_unregister() {
     // assert_eq!(ans2, "Hello".to_string());
     assert_eq!(ans3, "Hello".to_string());
 }
-
 
 #[tokio::test]
 async fn test_nonexistant_destination() {
@@ -235,7 +241,6 @@ async fn test_shutdown_panic2() {
     //assert(let None = should_be_none);
 }
 
-
 #[should_panic]
 // #[tokio::test]
 #[tokio::test(threaded_scheduler)]
@@ -262,9 +267,7 @@ async fn test_shutdown_panic1() {
             Message::Shutdown => {
                 break;
             }
-            Message::Message(text) => {
-                text
-            },
+            Message::Message(text) => text,
             _ => "Failure".to_string(),
         };
     }
@@ -276,7 +279,6 @@ async fn test_shutdown_panic1() {
 
 #[tokio::test]
 async fn test_shutdown_message() {
-
     let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
     let mut mbh2 = mbh.clone();
 
@@ -337,7 +339,6 @@ async fn test_rpc() {
 
 #[tokio::test(threaded_scheduler)]
 async fn test_pingpong() {
-
     let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     let mut mbh2 = mbh.clone();
     let mut mbh3 = mbh.clone();
@@ -388,8 +389,7 @@ async fn test_pingpong() {
     delay_for(Duration::from_millis(1000)).await;
     // mbh.send(2000, 1000).await;
     let result = mbh.rpc(2000, 420).await.unwrap();
-    println!("result: {}", result); 
+    println!("result: {}", result);
     assert!(result > 5000);
     // msg_bus.shutdown().await;
 }
-

@@ -1,3 +1,4 @@
+use crate::*;
 /// msg_bus is a simple to use Messaging system built using tokio::sync
 use log::*;
 use std::collections::HashMap;
@@ -5,19 +6,18 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::RwLock;
-use crate::*;
 
 ///
 /// # MsgBus
-/// This is the entry point for running the bus.  There are no options yet.  new() returns a tuple with a 
+/// This is the entry point for running the bus.  There are no options yet.  new() returns a tuple with a
 /// clone of MsgBus and a clone of [MsgBusHandle](struct.MsgBusHandle.html).  This the only copy of MsgBusHandle provided.  Don't lose it.
-/// 
+///
 /// * Type Parameters
 ///     * H - Hash or Handle.  This identifies listeners and is stored in a Hashmap
 ///     * M - Message.  This is the payload, it will be wrapped in a Message enum.  It can be any data structure that
 /// can be cloned
-/// 
-/// * `new()` - Returns a tuple of `(MsgBus<H,M>, MsgBusHandle<H,M>)` 
+///
+/// * `new()` - Returns a tuple of `(MsgBus<H,M>, MsgBusHandle<H,M>)`
 /// * `shutdown()` - Sends a Message::Shutdown message to all listeners and closes the receive port.  Once the queue
 /// is empty it will exit
 
@@ -111,7 +111,7 @@ impl<
         }
     }
 
-    async fn int_shutdown(&self)  {
+    async fn int_shutdown(&self) {
         debug!("Begin int_shutdown");
         let mut senders = self.senders.write().await;
         for (_, s) in senders.iter_mut() {
@@ -128,24 +128,26 @@ impl<
         debug!("Leaving int_shutdown");
     }
 
-
-
     async fn rpc(&self, key: H, msg: M, resp_tx: oneshot::Sender<RpcResponse<M>>) {
         let mut s = self.senders.write().await;
         match s.get_mut(&key) {
-            Some(tx) => { 
+            Some(tx) => {
                 let (new_oneshot_tx, rx) = oneshot::channel::<M>();
                 match tx.send(Message::Rpc(msg, new_oneshot_tx)).await {
                     Ok(_x) => {
                         resp_tx.send(RpcResponse::Ok(rx)).unwrap();
-                    },
+                    }
                     Err(_e) => {
-                        resp_tx.send(RpcResponse::Err(crate::MsgBusError::MsgBusClosed)).unwrap();
+                        resp_tx
+                            .send(RpcResponse::Err(crate::MsgBusError::MsgBusClosed))
+                            .unwrap();
                     }
                 }
-            },
+            }
             None => {
-                resp_tx.send(RpcResponse::Err(MsgBusError::UnknownRecipient)).unwrap();
+                resp_tx
+                    .send(RpcResponse::Err(MsgBusError::UnknownRecipient))
+                    .unwrap();
                 return;
             }
         };
@@ -154,12 +156,13 @@ impl<
     pub(crate) async fn broadcast(&self, msg: M) {
         let mut senders = self.senders.write().await;
 
-        senders.retain(|k,v| -> bool {
+        senders.retain(|k, v| -> bool {
             match futures::executor::block_on(v.send(Message::Broadcast(msg.clone()))) {
-                Ok(_) => { true },
-                Err(_) => { 
+                Ok(_) => true,
+                Err(_) => {
                     debug!("Dropped in broadcast {:?}", k);
-                    false },
+                    false
+                }
             }
         })
     }
@@ -168,10 +171,12 @@ impl<
         let mut s = self.senders.write().await;
         if let Some(tx) = &mut s.get_mut(&key) {
             match tx.send(Message::Message(msg)).await {
-                Ok(()) => {},
-                Err(_) => { s.remove(&key); },
+                Ok(()) => {}
+                Err(_) => {
+                    s.remove(&key);
+                }
             }
-        } 
+        }
     }
 
     async fn unreg(&self, key: H) {
@@ -183,8 +188,11 @@ impl<
     }
 }
 
-impl<H: Send + std::hash::Hash + Eq + PartialEq + Sync + std::fmt::Debug,
-    M: Send + Clone + Sync + std::fmt::Debug, > Clone for MsgBus<H,M> {
+impl<
+        H: Send + std::hash::Hash + Eq + PartialEq + Sync + std::fmt::Debug,
+        M: Send + Clone + Sync + std::fmt::Debug,
+    > Clone for MsgBus<H, M>
+{
     fn clone(&self) -> Self {
         Self {
             rx: self.rx.clone(),
