@@ -201,7 +201,7 @@ async fn test_nonexistant_destination() {
 async fn test_shutdown_panic2() {
     init();
 
-    let (msg_bus, mut mbh) = MsgBus::<usize, String>::new();
+    let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
     let mut mbh2 = mbh.clone();
 
     let mut rx = mbh.register(1001).await.unwrap();
@@ -242,7 +242,7 @@ async fn test_shutdown_panic2() {
 
 async fn test_shutdown_panic1() {
     init();
-    let (msg_bus, mut mbh) = MsgBus::<usize, String>::new();
+    let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
     let mut mbh2 = mbh.clone();
 
     let mut rx = mbh.register(1001).await.unwrap();
@@ -277,7 +277,7 @@ async fn test_shutdown_panic1() {
 #[tokio::test]
 async fn test_shutdown_message() {
 
-    let ( msg_bus, mut mbh) = MsgBus::<usize, String>::new();
+    let (mut msg_bus, mut mbh) = MsgBus::<usize, String>::new();
     let mut mbh2 = mbh.clone();
 
     let mut rx = mbh.register(1001).await.unwrap();
@@ -306,7 +306,7 @@ async fn test_shutdown_message() {
 async fn test_rpc() {
     // env_logger::init();
 
-    let (msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
+    let (mut msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     let mut mbh2 = mbh.clone();
 
     let _rx = mbh.register(1001).await.unwrap();
