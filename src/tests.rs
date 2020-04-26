@@ -200,6 +200,26 @@ async fn test_broadcast_after_unregister() {
 async fn test_nonexistant_destination() {
     let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     mbh.send(1000, 0).await.unwrap();
+    let resp = mbh.rpc(1000, 0).await;
+    if let Err(MsgBusError::UnknownRecipient) = resp {
+        return;
+    } else {
+        panic!("")
+    };
+}
+
+#[tokio::test]
+async fn test_rpc_timeout() {
+    let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
+    let _rx = mbh.register(1000).await.unwrap();
+
+    let resp = mbh.rpc_timeout(1000, 0, Duration::from_millis(1000)).await;
+    println!("resp = {:?}", resp);
+    if let Err(MsgBusError::MsgBusTimeout) = resp {
+        return;
+    } else {
+        panic!("")
+    };
 }
 
 #[should_panic]
