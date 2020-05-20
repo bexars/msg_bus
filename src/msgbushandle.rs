@@ -2,6 +2,7 @@ use crate::*;
 /// msg_bus is a simple to use Messaging system built using tokio::sync
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio::time::Duration;
 
 /// This is the main interface for MsgBus.  It's cloneable, can send to any registered listener and can create and register
 /// infinite amount of listeners.  When register is called it will return a tokio::sync::mpsc::Receiver<H,M>.  You will need to
@@ -16,19 +17,20 @@ use tokio::sync::oneshot;
 ///     Echo,
 ///     Pong(usize),  
 /// }
-///
-/// let (mbus, mbushan) = MsgBus<String, String>::new();
+/// #[tokio::main]
+/// async fn main() {
+///    let (mbus, mut mbushan) = MsgBus::<String, u32>::new();
 ///
 /// tokio::task::spawn(async move {
-///    let mut counter = 0;
-///    let mut rx = mbushan.register("listener").await.unwrap();
+///    let mut counter: u32 = 0;
+///    let mut rx = mbushan.register("listener".to_string()).await.unwrap();
 ///    while let Some(msg) = rx.recv().await {
 ///      match msg {
 ///         Message::Rpc(input_num, resp_tx) => {
 ///             resp_tx.send(counter);
 ///         }
 ///         Message::Message(input_num) => {
-///             mbh2.send("listener3", input_num + 5).await;
+///             mbushan.send("listener3".to_string(), input_num + 5).await;
 ///             counter = input_num;
 ///         }
 ///         Message::Shutdown => {}  // TODO Handle a shutdown notification?
@@ -36,6 +38,7 @@ use tokio::sync::oneshot;
 ///     }
 /// }
 /// });
+/// }
 /// ```
 ///
 ///
@@ -68,7 +71,7 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         H: 'static,
         M: 'static,
     {
-        let (tx, rx) = mpsc::channel::<Message<M>>(50);
+        let (tx, rx) = mpsc::channel::<Message<M>>(1);
         if let Err(e) = self._send(IntMessage::Register(id, tx)).await {
             Err(e)
         } else {
@@ -99,6 +102,18 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         } else {
             Ok(())
         }
+    }
+
+    /// Wrapper function to call rpc_timeout with a 10_000 millisecond timeout
+
+    pub async fn rpc_timeout(&mut self, dest: H, msg: M, wait: Duration) -> Result<M>
+    where
+        H: 'static,
+        M: 'static,
+    {
+        tokio::time::timeout(wait, self.rpc(dest, msg))
+            .await
+            .unwrap_or(Err(MsgBusError::MsgBusTimeout))
     }
 
     /// A simple RPC function that sends a message to a specific listener and gives them a `tokio::sync::oneshot::Sender<M>` to reply with.

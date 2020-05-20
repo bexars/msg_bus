@@ -1,17 +1,11 @@
-#[cfg(test)]
+
 use env_logger;
-#[cfg(test)]
 use log::*;
 
-#[cfg(test)]
 use crate::*;
-#[cfg(test)]
 use std::time::Duration;
-#[cfg(test)]
 use std::{thread, time};
-#[cfg(test)]
 use tokio::time::delay_for;
-#[cfg(test)]
 //use log::Level;
 #[cfg(test)]
 fn init() {
@@ -197,9 +191,34 @@ async fn test_broadcast_after_unregister() {
 }
 
 #[tokio::test]
-async fn test_nonexistant_destination() {
+async fn test_nonexistant_destination_send() {
     let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     mbh.send(1000, 0).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_nonexistant_destination_rpc() {
+    let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
+    let resp = mbh.rpc(1000, 0).await;
+    if let Err(MsgBusError::UnknownRecipient) = resp {
+        return;
+    } else {
+        panic!("")
+    };
+}
+
+#[tokio::test]
+async fn test_rpc_timeout() {
+    let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
+    let _rx = mbh.register(1000).await.unwrap();
+
+    let resp = mbh.rpc_timeout(1000, 0, Duration::from_millis(1000)).await;
+    println!("resp = {:?}", resp);
+    if let Err(MsgBusError::MsgBusTimeout) = resp {
+        return;
+    } else {
+        panic!("")
+    };
 }
 
 #[should_panic]

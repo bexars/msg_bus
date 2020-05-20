@@ -8,6 +8,7 @@ use tokio::sync::oneshot::error::RecvError;
 #[derive(Debug)]
 pub enum MsgBusError {
     MsgBusClosed,
+    MsgBusTimeout,
     UnknownRecipient,
 }
 
@@ -24,6 +25,7 @@ impl fmt::Display for MsgBusError {
         match *self {
             MsgBusError::MsgBusClosed => write!(f, "MsgBus is shutdown"),
             MsgBusError::UnknownRecipient => write!(f, "Destination was not registered"),
+            MsgBusError::MsgBusTimeout => write!(f, "RPC call timed out"),
         }
     }
 }

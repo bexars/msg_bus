@@ -20,8 +20,15 @@ futures = "0.3.4"
 # futures = "0.3.4"
 futures-test = "0.3.4"
 env_logger = "0.7.1"
+criterion = "0.3"
 tokio = { version = "0.2", features = ["rt-core", "macros", "sync","time","io-std","io-util","net","stream", "tcp", "blocking"] }
 
 
 # [example]
 # name="marco_polo"
+
+[[bench]]
+name = "msgbus_benchmark"
+harness = false
+
+
