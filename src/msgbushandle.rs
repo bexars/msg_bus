@@ -70,7 +70,7 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         H: 'static,
         M: 'static,
     {
-        let (tx, rx) = mpsc::channel::<Message<M>>(50);
+        let (tx, rx) = mpsc::channel::<Message<M>>(1);
         if let Err(e) = self._send(IntMessage::Register(id, tx)).await {
             Err(e)
         } else {

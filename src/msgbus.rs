@@ -44,7 +44,7 @@ impl<
         H: 'static,
         M: 'static,
     {
-        let (tx, rx) = mpsc::channel::<IntMessage<H, M>>(50);
+        let (tx, rx) = mpsc::channel::<IntMessage<H, M>>(1);
         let rx = Arc::new(RwLock::new(rx));
 
         let bus = Self {
@@ -154,26 +154,32 @@ impl<
     }
 
     pub(crate) async fn broadcast(&self, msg: M) {
-        let mut senders = self.senders.write().await;
-
-        senders.retain(|k, v| -> bool {
+        let senders = &mut self.senders.write().await;
+        let mut to_remove = Vec::new();
+        for (k,v) in senders.iter_mut() {
             match futures::executor::block_on(v.send(Message::Broadcast(msg.clone()))) {
-                Ok(_) => true,
+                Ok(_) => {}
                 Err(_) => {
                     debug!("Dropped in broadcast {:?}", k);
-                    false
+                    let k = k.clone();
+                    to_remove.push(k);
+                    // senders.remove(&k);
+                    
                 }
             }
-        })
+        }
+        for k in to_remove {
+            senders.remove(&k);
+        }
     }
 
     async fn msg_to(&self, key: H, msg: M) {
-        let mut s = self.senders.write().await;
-        if let Some(tx) = &mut s.get_mut(&key) {
+        let mut senders = self.senders.write().await;
+        if let Some(tx) = &mut senders.get_mut(&key) {
             match tx.send(Message::Message(msg)).await {
                 Ok(()) => {}
                 Err(_) => {
-                    s.remove(&key);
+                    senders.remove(&key);
                 }
             }
         }
