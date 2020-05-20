@@ -8,6 +8,7 @@ use tokio::sync::oneshot;
 mod errors;
 mod msgbus;
 mod msgbushandle;
+#[cfg(test)]
 mod tests;
 
 pub type Result<T> = std::result::Result<T, MsgBusError>;

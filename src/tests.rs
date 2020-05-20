@@ -1,19 +1,12 @@
-#[cfg(test)]
+
 use env_logger;
-#[cfg(test)]
 use log::*;
 
-#[cfg(test)]
 use crate::*;
-#[cfg(test)]
 use std::time::Duration;
-#[cfg(test)]
 use std::{thread, time};
-#[cfg(test)]
 use tokio::time::delay_for;
-#[cfg(test)]
 //use log::Level;
-#[cfg(test)]
 fn init() {
     let _ = env_logger::builder().is_test(true).try_init();
 }
@@ -32,6 +25,14 @@ async fn test_register() {
     };
     assert_eq!(&result, "registered?");
 }
+
+// #[tokio::main]
+// async fn bench_send_msg() {
+//     let (_, mut mbh) = MsgBus::<String, String>::new();
+
+//     b.iter(|| add_two(2));
+// }
+
 
 #[tokio::test]
 #[should_panic]
