@@ -107,56 +107,56 @@ async fn test_broadcast() {
     assert_eq!(ans3, "Hello".to_string());
 }
 
-#[tokio::test]
-// #[tokio::test(threaded_scheduler)]
-async fn test_broadcast_after_drop_rx() {
-    init();
-    let (bus, mut mbh) = MsgBus::<usize, String>::new();
-    let mut mbh2 = mbh.clone();
-    let mut mbh3 = mbh.clone();
+// #[tokio::test]
+// // #[tokio::test(threaded_scheduler)]
+// async fn test_broadcast_after_drop_rx() {
+//     init();
+//     let (bus, mut mbh) = MsgBus::<usize, String>::new();
+//     let mut mbh2 = mbh.clone();
+//     let mut mbh3 = mbh.clone();
 
-    let mut rx = mbh.register(1001).await.unwrap();
-    let rx2 = mbh2.register(2002).await.unwrap();
-    let mut rx3 = mbh3.register(3003).await.unwrap();
-    drop(rx2);
-    println!("before broadcast");
-    let _resp = bus.broadcast("Direct".to_string()).await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
-    tokio::task::yield_now().await;
+//     let mut rx = mbh.register(1001).await.unwrap();
+//     let rx2 = mbh2.register(2002).await.unwrap();
+//     let mut rx3 = mbh3.register(3003).await.unwrap();
+//     drop(rx2);
+//     println!("before broadcast");
+//     let _resp = bus.broadcast("Direct".to_string()).await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
+//     tokio::task::yield_now().await;
 
-    //.await.unwrap();
-    //        panic!("Fail now!");
-    let resp = mbh.broadcast("Hello".to_string()).await;
-    println!("{:?}", resp);
-    tokio::task::yield_now().await;
+//     //.await.unwrap();
+//     //        panic!("Fail now!");
+//     let resp = mbh.broadcast("Hello".to_string()).await;
+//     println!("{:?}", resp);
+//     tokio::task::yield_now().await;
 
-    println!("after broadcast");
-    let resp = rx.recv().await.unwrap();
-    // let resp2 = rx2.recv().await.unwrap();
-    let resp3 = rx3.recv().await.unwrap();
-    let ans1 = match resp {
-        Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
-    };
-    // let ans2 = match resp2 {
-    //     Message::Broadcast(text) => text,
-    //     _ => "Failure".to_string(),
-    // };
-    let ans3 = match resp3 {
-        Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
-    };
+//     println!("after broadcast");
+//     let resp = rx.recv().await.unwrap();
+//     // let resp2 = rx2.recv().await.unwrap();
+//     let resp3 = rx3.recv().await.unwrap();
+//     let ans1 = match resp {
+//         Message::Broadcast(text) => text,
+//         _ => "Failure".to_string(),
+//     };
+//     // let ans2 = match resp2 {
+//     //     Message::Broadcast(text) => text,
+//     //     _ => "Failure".to_string(),
+//     // };
+//     let ans3 = match resp3 {
+//         Message::Broadcast(text) => text,
+//         _ => "Failure".to_string(),
+//     };
 
-    assert_eq!(ans1, "Hello".to_string());
-    // assert_eq!(ans2, "Hello".to_string());
-    assert_eq!(ans3, "Hello".to_string());
-}
+//     assert_eq!(ans1, "Hello".to_string());
+//     // assert_eq!(ans2, "Hello".to_string());
+//     assert_eq!(ans3, "Hello".to_string());
+// }
 
 #[tokio::test]
 async fn test_broadcast_after_unregister() {
