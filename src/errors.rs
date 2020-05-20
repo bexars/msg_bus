@@ -1,10 +1,7 @@
 use std::error;
 use std::fmt;
-use tokio::sync::oneshot::error::{RecvError};
 use tokio::sync::mpsc::error::SendError;
-
-
-
+use tokio::sync::oneshot::error::RecvError;
 
 /// Error type returned when trying to send a message through `MsgBusHandle` and `MsgBus` is shut down
 
@@ -25,8 +22,8 @@ impl error::Error for MsgBusError {
 impl fmt::Display for MsgBusError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            MsgBusError::MsgBusClosed => { write!(f,"MsgBus is shutdown") },
-            MsgBusError::UnknownRecipient => { write!(f, "Destination was not registered")}, 
+            MsgBusError::MsgBusClosed => write!(f, "MsgBus is shutdown"),
+            MsgBusError::UnknownRecipient => write!(f, "Destination was not registered"),
         }
     }
 }

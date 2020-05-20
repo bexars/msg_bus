@@ -1,9 +1,11 @@
 use super::*;
 
-pub struct Player {
-}
+pub struct Player {}
 impl Player {
-    pub async fn start(mut handle: MsgBusHandle<String, MarcoPoloMsg>, stream: TcpStream) -> tokio::io::Result<()> {        
+    pub async fn start(
+        mut handle: MsgBusHandle<String, MarcoPoloMsg>,
+        stream: TcpStream,
+    ) -> tokio::io::Result<()> {
         println!("Player in start()");
         stream.set_nodelay(true)?;
         let mut stream = BufStream::new(stream);
@@ -13,26 +15,40 @@ impl Player {
         // let t_out = BufWriter::new(stream);
         // let t_in = BufReader::new(stream);
 
-        stream.write_all(b"A bored looking lifeguard sees you approaching.\n\r").await?;
-        stream.write_all(b"  \"What's your name buddy?\"\n\r").await?;
+        stream
+            .write_all(b"A bored looking lifeguard sees you approaching.\n\r")
+            .await?;
+        stream
+            .write_all(b"  \"What's your name buddy?\"\n\r")
+            .await?;
         stream.flush().await?;
         let mut p_name = String::new();
         stream.read_line(&mut p_name).await?;
         let name = p_name.trim();
-//        name.clear();
-//        t_in.read_line(name).await?;
-//        t_out.flush().await?;
-        stream.write_all(format!("Welcome to the pool {}.  Looks like a game of Marco Polo is being played.\n\r", name).as_bytes()).await?;
-        stream.write_all(b"JUMP in and take a LOOK around.\n\r").await?;
+        //        name.clear();
+        //        t_in.read_line(name).await?;
+        //        t_out.flush().await?;
+        stream
+            .write_all(
+                format!(
+                    "Welcome to the pool {}.  Looks like a game of Marco Polo is being played.\n\r",
+                    name
+                )
+                .as_bytes(),
+            )
+            .await?;
+        stream
+            .write_all(b"JUMP in and take a LOOK around.\n\r")
+            .await?;
         stream.flush().await?;
 
         let mut rx = handle.register(String::from(name.clone())).await.unwrap();
         // let mut t_in = t_in.into_inner();
         // let mut t_in_lines = stream.lines();
-        loop {  
+        loop {
             let mut input = String::new();
             stream.flush().await.unwrap();
-            tokio::select!{
+            tokio::select! {
                 Ok(len) = stream.read_line(&mut input) => {
                 //Some(Ok(input)) = t_in_lines.next()  => {
                     println!("Echo: {}", input);
@@ -106,11 +122,10 @@ impl Player {
                             };
                         }
                     } // end match Message::...
-        
+
                 }
-            }      
-            
-        }; // end while loop
+            }
+        } // end while loop
         Ok(())
     }
 }
