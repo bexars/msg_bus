@@ -19,7 +19,7 @@ futures = "0.3.4"
 [dev-dependencies]
 # futures = "0.3.4"
 futures-test = "0.3.4"
-env_logger = "0.7.1"
+env_logger = "0.8.2"
 criterion = "0.3"
 tokio = { version = "1.0.2", features = ["rt-multi-thread", "macros", "sync","time","io-std","io-util","net"] }
 
