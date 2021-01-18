@@ -3,10 +3,13 @@ use msgbus::MsgBusHandle;
 use msgbus::*;
 use player::Player;
 use pool::Pool;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::prelude::*;
-use tokio::stream::StreamExt;
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufStream},
+    task::JoinHandle,
+};
+// use tokio::prelude::*;
+// use tokio::stream::StreamExt;
 
 pub mod marco;
 pub mod player;
@@ -32,7 +35,7 @@ pub enum MarcoPoloMsg {
 async fn main() {
     let (mbus, mbushan) = MsgBus::<String, MarcoPoloMsg>::new();
 
-    let pool_han = tokio::spawn(Pool::start(mbushan.clone()));
+    let pool_han: JoinHandle<_> = tokio::spawn(Pool::start(mbushan.clone()));
     let marco_han = tokio::spawn(Marco::start(mbushan.clone(), mbus));
     let _result = tokio::join!(pool_han, marco_han);
 }

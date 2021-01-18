@@ -1,11 +1,11 @@
-
 use env_logger;
 use log::*;
+use tokio::time::sleep;
 
 use crate::*;
 use std::time::Duration;
 use std::{thread, time};
-use tokio::time::delay_for;
+// use tokio::time::sleep;
 //use log::Level;
 #[cfg(test)]
 fn init() {
@@ -232,11 +232,11 @@ async fn test_shutdown_panic2() {
     let mut rx = mbh.register(1001).await.unwrap();
     tokio::task::spawn(async move {
         mbh2.send(1001, "Hello".to_string()).await.unwrap();
-        delay_for(Duration::from_millis(1000)).await;
+        sleep(Duration::from_millis(1000)).await;
         debug!("Awake");
         mbh2.send(1001, "Hello".to_string()).await.unwrap();
         msg_bus.shutdown().await.unwrap();
-        delay_for(Duration::from_millis(1000)).await;
+        sleep(Duration::from_millis(1000)).await;
         debug!("Awake");
         mbh2.send(1001, "Hello".to_string()).await.unwrap();
     });
@@ -262,7 +262,7 @@ async fn test_shutdown_panic2() {
 
 #[should_panic]
 // #[tokio::test]
-#[tokio::test(threaded_scheduler)]
+#[tokio::test()]
 
 async fn test_shutdown_panic1() {
     init();
@@ -272,11 +272,11 @@ async fn test_shutdown_panic1() {
     let mut rx = mbh.register(1001).await.unwrap();
     tokio::task::spawn(async move {
         mbh2.send(1001, "Hello".to_string()).await.unwrap();
-        delay_for(Duration::from_millis(1000)).await;
+        sleep(Duration::from_millis(1000)).await;
         debug!("Awake");
         mbh2.send(1001, "Hello".to_string()).await.unwrap();
         msg_bus.shutdown().await.unwrap();
-        delay_for(Duration::from_millis(1000)).await;
+        sleep(Duration::from_millis(1000)).await;
         debug!("Awake");
         //mbh2.send(1001, "Hello".to_string()).await.unwrap();
     });
@@ -323,7 +323,7 @@ async fn test_shutdown_message() {
     //assert(let None = should_be_none);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test()]
 async fn test_rpc() {
     // env_logger::init();
 
@@ -350,13 +350,13 @@ async fn test_rpc() {
     // tokio::task::yield_now().await;
     // tokio::task::yield_now().await;
     // tokio::task::yield_now().await;
-    delay_for(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
     mbh.send(2000, 1000).await.unwrap();
     assert_eq!(mbh.rpc(2000, 420).await.unwrap(), 489);
     msg_bus.shutdown().await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test()]
 async fn test_pingpong() {
     let (_msg_bus, mut mbh) = MsgBus::<usize, usize>::new();
     let mut mbh2 = mbh.clone();
@@ -392,12 +392,12 @@ async fn test_pingpong() {
             }
         }
     });
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let mut num = 0;
     mbh.send(2000, 0).await.unwrap();
     while num < 5000 {
-        delay_for(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
         num = mbh.rpc(2000, 0).await.unwrap();
         // info!("Num = {}", num);
     }
@@ -405,7 +405,7 @@ async fn test_pingpong() {
     // tokio::task::yield_now().await;
     // tokio::task::yield_now().await;
     // tokio::task::yield_now().await;
-    delay_for(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(1000)).await;
     // mbh.send(2000, 1000).await;
     let result = mbh.rpc(2000, 420).await.unwrap();
     println!("result: {}", result);

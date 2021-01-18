@@ -3,7 +3,7 @@ use super::*;
 pub struct Pool {}
 
 impl Pool {
-    pub async fn start(mut handle: MsgBusHandle<String, MarcoPoloMsg>) -> io::Result<()> {
+    pub async fn start(mut handle: MsgBusHandle<String, MarcoPoloMsg>) -> Result<()> {
         let mut rx = handle.register(String::from("Pool")).await.unwrap();
         handle
             .broadcast(MarcoPoloMsg::LifeguardYells(String::from(
@@ -14,12 +14,12 @@ impl Pool {
         // port 7780 is "MP" in ascii decimal MP = Marco Polo
         let mut players: Vec<String> = Vec::new();
 
-        let mut listener = TcpListener::bind("0.0.0.0:7780").await.unwrap();
+        let listener = TcpListener::bind("0.0.0.0:7780").await.unwrap();
         loop {
             tokio::select! {
-                Some(stream) = listener.next() => {
+                Ok((stream, _addr)) = listener.accept() => {
                     let handle = handle.clone();
-                    let stream = stream.unwrap();
+                    // let stream = stream.unwrap();
                     println!("Inbound swimmer!");
                     tokio::spawn(Player::start(handle,stream));
                     // tokio::task::spawn_blocking(|| async move { Player::start(handle, stream) } );

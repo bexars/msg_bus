@@ -1,10 +1,10 @@
+use tokio::sync::{mpsc, oneshot};
+
 pub use crate::errors::MsgBusError;
 pub use crate::msgbus::MsgBus;
 pub use crate::msgbushandle::MsgBusHandle;
 /// msg_bus is a simple to use Messaging system built using tokio::sync
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-
+// use tokio::sync::{mpsc, oneshot};
 mod errors;
 mod msgbus;
 mod msgbushandle;

@@ -7,11 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 
-[[example]]
-name="marco_polo"
+# [[example]]
+# name="marco_polo"
 
 [dependencies]
-tokio = { version = "0.2", features = ["rt-core", "macros", "sync","time"] }
+tokio = { version = "1.0.2", features = ["rt-multi-thread", "macros", "sync","time"] }
 log = "0.4.8"
 futures = "0.3.4" 
 
@@ -21,7 +21,7 @@ futures = "0.3.4"
 futures-test = "0.3.4"
 env_logger = "0.7.1"
 criterion = "0.3"
-tokio = { version = "0.2", features = ["rt-core", "macros", "sync","time","io-std","io-util","net","stream", "tcp", "blocking"] }
+tokio = { version = "1.0.2", features = ["rt-multi-thread", "macros", "sync","time","io-std","io-util","net"] }
 
 
 # [example]

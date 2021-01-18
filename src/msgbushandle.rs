@@ -159,7 +159,7 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         M: 'static,
     {
         let msg = msg;
-        let mut bus_tx = self.bus_tx.clone();
+        let bus_tx = self.bus_tx.clone();
         Ok(bus_tx.send(msg).await?)
     }
 }

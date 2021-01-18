@@ -156,7 +156,7 @@ impl<
     pub(crate) async fn broadcast(&self, msg: M) {
         let senders = &mut self.senders.write().await;
         let mut to_remove = Vec::new();
-        for (k,v) in senders.iter_mut() {
+        for (k, v) in senders.iter_mut() {
             match futures::executor::block_on(v.send(Message::Broadcast(msg.clone()))) {
                 Ok(_) => {}
                 Err(_) => {
@@ -164,7 +164,6 @@ impl<
                     let k = k.clone();
                     to_remove.push(k);
                     // senders.remove(&k);
-                    
                 }
             }
         }

@@ -1,6 +1,8 @@
+use tokio::time::sleep;
+
 use super::*;
 use std::time::Duration;
-use tokio::time::delay_for;
+// use tokio::time::delay_for;
 
 pub struct Marco {}
 
@@ -21,7 +23,7 @@ impl Marco {
                     match &*input {
                         "quit" => {
                             handle.broadcast(MarcoPoloMsg::LifeguardYells("Pool is closing in 5 seconds!".to_string())).await.unwrap();
-                            delay_for(Duration::from_millis(5000)).await;
+                            sleep(Duration::from_millis(5000)).await;
                             bus.shutdown().await.unwrap();
                             break;
                         }
