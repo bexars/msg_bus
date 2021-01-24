@@ -2,6 +2,9 @@ use tokio::time::sleep;
 
 use super::*;
 use std::time::Duration;
+use std::sync::Arc;
+use std::borrow::Borrow;
+
 // use tokio::time::delay_for;
 
 pub struct Marco {}
@@ -22,7 +25,8 @@ impl Marco {
                     let input = input.trim();
                     match &*input {
                         "quit" => {
-                            handle.broadcast(MarcoPoloMsg::LifeguardYells("Pool is closing in 5 seconds!".to_string())).await.unwrap();
+                            let msg = MarcoPoloMsg::LifeguardYells("Pool is closing in 5 seconds!".to_string());
+                            handle.broadcast(msg).await.unwrap();
                             sleep(Duration::from_millis(5000)).await;
                             bus.shutdown().await.unwrap();
                             break;
@@ -33,9 +37,9 @@ impl Marco {
                             handle.broadcast(MarcoPoloMsg::Marco).await.unwrap();
                         }
                     }
-                    // Any input is a Marco call
-                    println!("Yelling \"Marco!\"");
-                    handle.broadcast(MarcoPoloMsg::Marco).await.unwrap();
+                    // // Any input is a Marco call
+                    // println!("Yelling \"Marco!\"");
+                    // handle.broadcast(MarcoPoloMsg::Marco).await.unwrap();
                 },
                 Some(msg) = rx.recv() => {
                     match msg {
@@ -44,7 +48,7 @@ impl Marco {
                             break;
                         }
                         Message::Broadcast(mp_msg ) => {
-                            match mp_msg {
+                            match mp_msg.borrow() {
                                 MarcoPoloMsg::Polo => {
                                     println!("Polo!");
                                 }
@@ -53,6 +57,9 @@ impl Marco {
                                 }
                                 MarcoPoloMsg::PlayerClimbedOut => {
                                     println!("Sounds like someone just climbed out of the pool...  Some people can't handle it.");
+                                }
+                                MarcoPoloMsg::LifeguardYells(yell) => {
+                                    println!("{}", yell);
                                 }
                                 _ => {}
                             };

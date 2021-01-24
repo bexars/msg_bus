@@ -1,4 +1,5 @@
 use super::*;
+use std::borrow::Borrow;
 
 pub struct Player {}
 impl Player {
@@ -56,9 +57,9 @@ impl Player {
                     let input = input.trim();
                     stream.flush().await.unwrap();
                     match &*input {
-                        "" => {
-                            handle.send("Pool".to_string(), MarcoPoloMsg::Polo).await.unwrap();
-                        },
+                        // "" => {
+                        //     handle.send("Pool".to_string(), MarcoPoloMsg::Polo).await.unwrap();
+                        // },
                         "jump" => {
                             handle.send("Pool".to_string(), MarcoPoloMsg::JumpIn(name.to_string())).await.unwrap();
                         },
@@ -75,6 +76,13 @@ impl Player {
                             }
                             // stream.flush();
                             // tokio::task::yield_now().await;
+                        },
+                        "polo" => {
+                            handle.broadcast( MarcoPoloMsg::Polo).await.unwrap();
+                        },
+                        "leave" | "exit" => {
+                            handle.broadcast( MarcoPoloMsg::PlayerClimbedOut).await.unwrap();
+                            break;
                         }
                         _ => {},
                     }
@@ -97,13 +105,13 @@ impl Player {
                         Message::Rpc(_mp_msg, _response_handle) => {},
                         Message::Message(_mp_msg) => {}
                         Message::Broadcast(mp_msg ) => {
-                            match mp_msg {
+                            match mp_msg.borrow() {
                                 MarcoPoloMsg::Marco => {
                                     stream.write_all(b"A loud \"Marco!!\" resonates across the pool.\n\r").await?;
                                     stream.flush().await?;
                                 }
                                 MarcoPoloMsg::Polo => {
-                                    stream.write_all(b"Anotther player yells \"POLO\"\n\r").await?;
+                                    stream.write_all(b"\"POLO\"\n\r").await?;
                                     stream.flush().await?;
                                 }
                                 MarcoPoloMsg::PlayerJumpedIn => {

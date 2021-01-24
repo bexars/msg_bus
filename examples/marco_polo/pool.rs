@@ -7,7 +7,7 @@ impl Pool {
         let mut rx = handle.register(String::from("Pool")).await.unwrap();
         handle
             .broadcast(MarcoPoloMsg::LifeguardYells(String::from(
-                "Hold your britches!  We'll be open in a sec...",
+                "Hold your britches!  We'll be open in a sec...\n\rTelnet to localhost:7780 to enter the pool",
             )))
             .await
             .unwrap();

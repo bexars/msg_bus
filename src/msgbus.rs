@@ -22,7 +22,7 @@ use tokio::sync::RwLock;
 /// is empty it will exit
 
 #[derive(Debug)]
-pub struct MsgBus<H, M>
+pub struct MsgBus<H, M: 'static>
 where
     H: std::hash::Hash,
     H: std::cmp::Eq,
@@ -38,11 +38,10 @@ impl<
     > MsgBus<H, M>
 {
     #[allow(dead_code)]
-
     pub fn new() -> (MsgBus<H, M>, MsgBusHandle<H, M>)
-    where
-        H: 'static,
-        M: 'static,
+        where
+            H: 'static,
+            M: 'static,
     {
         let (tx, rx) = mpsc::channel::<IntMessage<H, M>>(1);
         let rx = Arc::new(RwLock::new(rx));
@@ -73,9 +72,9 @@ impl<
     }
 
     async fn run(self)
-    where
-        H: 'static,
-        M: 'static,
+        where
+            H: 'static,
+            M: 'static,
     {
         // let rx = self.rx.clone();
         while let Some(msg) = self.rx.write().await.recv().await {
@@ -153,24 +152,21 @@ impl<
         };
     }
 
-    pub(crate) async fn broadcast(&self, msg: M) {
-        let senders = &mut self.senders.write().await;
-        let mut to_remove = Vec::new();
-        for (k, v) in senders.iter_mut() {
-            match futures::executor::block_on(v.send(Message::Broadcast(msg.clone()))) {
-                Ok(_) => {}
-                Err(_) => {
-                    debug!("Dropped in broadcast {:?}", k);
-                    let k = k.clone();
-                    to_remove.push(k);
-                    // senders.remove(&k);
-                }
+    pub(crate) async fn broadcast(&self, msg: Arc<M>) {
+        let mut senders = self.senders.write().await;
+        let mut remove_list = Vec::new();
+        for (k,v) in senders.iter_mut() {
+            match v.send(Message::Broadcast(Arc::clone(&msg))).await {
+                Ok(_) => {},
+                Err(_) => { remove_list.push(k.clone()) }
             }
         }
-        for k in to_remove {
+        for k in remove_list {
             senders.remove(&k);
         }
     }
+
+
 
     async fn msg_to(&self, key: H, msg: M) {
         let mut senders = self.senders.write().await;

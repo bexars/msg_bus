@@ -45,13 +45,13 @@ use tokio::time::Duration;
 /// This handle is returned as part of the tuple from `MsgBus::new()`
 ///
 
-pub struct MsgBusHandle<H, M> {
+pub struct MsgBusHandle<H, M: 'static> {
     pub(crate) bus_tx: mpsc::Sender<IntMessage<H, M>>,
     // id: Option<H>,
 }
 
 impl<H: Send + Sync, M: Send + Sync> Clone for MsgBusHandle<H, M> {
-    /// Cloneing is the only way to get more handles.  Each handle has no memory except for how to talk to the `MsgBus`.  Any handle can send
+    /// Cloning is the only way to get more handles.  Each handle has no memory except for how to talk to the `MsgBus`.  Any handle can send
     /// to any listener
     fn clone(&self) -> Self {
         Self {
@@ -97,7 +97,7 @@ impl<H: Send + Sync, M: Send + Sync> MsgBusHandle<H, M> {
         H: 'static,
         M: 'static,
     {
-        if let Err(e) = self._send(IntMessage::Broadcast(msg)).await {
+        if let Err(e) = self._send(IntMessage::Broadcast(Arc::new(msg))).await {
             Err(e)
         } else {
             Ok(())

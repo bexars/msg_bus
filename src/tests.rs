@@ -78,33 +78,33 @@ async fn test_send_message() {
 
 #[tokio::test]
 async fn test_broadcast() {
-    let (_, mut mbh) = MsgBus::<usize, String>::new();
+    let (_, mut mbh) = MsgBus::<usize, &str>::new();
     let mut mbh2 = mbh.clone();
     let mut mbh3 = mbh.clone();
 
     let mut rx = mbh.register(1001).await.unwrap();
     let mut rx2 = mbh2.register(2002).await.unwrap();
     let mut rx3 = mbh3.register(3003).await.unwrap();
-    mbh.broadcast("Hello".to_string()).await.unwrap();
+    mbh.broadcast(&"Hello").await.unwrap();
     let resp = rx.recv().await.unwrap();
     let resp2 = rx2.recv().await.unwrap();
     let resp3 = rx3.recv().await.unwrap();
     let ans1 = match resp {
         Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
+        _ => "Failure".into(),
     };
     let ans2 = match resp2 {
         Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
+        _ => "Failure".into(),
     };
     let ans3 = match resp3 {
         Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
+        _ => "Failure".into(),
     };
 
-    assert_eq!(ans1, "Hello".to_string());
-    assert_eq!(ans2, "Hello".to_string());
-    assert_eq!(ans3, "Hello".to_string());
+    assert_eq!(*ans1, "Hello".to_string());
+    assert_eq!(*ans2, "Hello".to_string());
+    assert_eq!(*ans3, "Hello".to_string());
 }
 
 // #[tokio::test]
@@ -160,7 +160,7 @@ async fn test_broadcast() {
 
 #[tokio::test]
 async fn test_broadcast_after_unregister() {
-    let (_, mut mbh) = MsgBus::<usize, String>::new();
+    let (_, mut mbh) = MsgBus::<usize, &str>::new();
     let mut mbh2 = mbh.clone();
     let mut mbh3 = mbh.clone();
 
@@ -168,13 +168,13 @@ async fn test_broadcast_after_unregister() {
     let _rx2 = mbh2.register(2002).await.unwrap();
     let mut rx3 = mbh3.register(3003).await.unwrap();
     mbh.unregister(2002).await.unwrap();
-    mbh.broadcast("Hello".to_string()).await.unwrap();
+    mbh.broadcast(&"Hello").await.unwrap();
     let resp = rx.recv().await.unwrap();
     //        let resp2 = rx2.recv().await.unwrap();
     let resp3 = rx3.recv().await.unwrap();
     let ans1 = match resp {
         Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
+        _ => "Failure".into(),
     };
     // let ans2 = match resp2 {
     //     Message::Broadcast(text) => text,
@@ -182,12 +182,12 @@ async fn test_broadcast_after_unregister() {
     // };
     let ans3 = match resp3 {
         Message::Broadcast(text) => text,
-        _ => "Failure".to_string(),
+        _ => "Failure".into(),
     };
 
-    assert_eq!(ans1, "Hello".to_string());
+    assert_eq!(*ans1, "Hello".to_string());
     // assert_eq!(ans2, "Hello".to_string());
-    assert_eq!(ans3, "Hello".to_string());
+    assert_eq!(*ans3, "Hello".to_string());
 }
 
 #[tokio::test]

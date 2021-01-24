@@ -37,5 +37,5 @@ async fn main() {
 
     let pool_han: JoinHandle<_> = tokio::spawn(Pool::start(mbushan.clone()));
     let marco_han = tokio::spawn(Marco::start(mbushan.clone(), mbus));
-    let _result = tokio::join!(pool_han, marco_han);
+    let _result = tokio::join!(marco_han, pool_han);
 }
