@@ -3,7 +3,6 @@ use tokio::sync::{mpsc, oneshot};
 pub use crate::errors::MsgBusError;
 pub use crate::msgbus::MsgBus;
 pub use crate::msgbushandle::MsgBusHandle;
-use std::cell::RefCell;
 use std::sync::Arc;
 
 /// msg_bus is a simple to use Messaging system built using tokio::sync
